@@ -142,7 +142,7 @@ Module.register("MMM-LeagueStats", {
           }
 
           Object.entries(player.scores).forEach(([k, score]) => {
-            playerRow.find("." + k).text(score);
+            playerRow.find("." + k).text(score.toFixed(0));
           });
 
           playerRow
