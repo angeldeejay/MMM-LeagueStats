@@ -124,7 +124,13 @@ Module.register("MMM-LeagueStats", {
             `.in-game-stats .row-${i} .player.${teamClass}`
           );
 
-          playerRow.find(".respawn-timer").text(player.respawnTimer);
+          playerRow
+            .find(".respawn-timer")
+            .text(
+              player.respawnTimer && typeof player.respawnTimer === "number"
+                ? player.respawnTimer.toFixed(0)
+                : "0"
+            );
           playerRow
             .find(".champion-avatar")
             .attr(
