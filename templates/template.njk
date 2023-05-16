@@ -1,0 +1,117 @@
+<div class="is-block is-relative">
+  <div class="columns is-mobile is-relative is-gapless">
+    <div class="column is-half is-relative is-hidden summoner-profile-card">
+      <div class="columns is-mobile is-gapless is-relative">
+        <div class="column is-flex is-flex-direction-column is-justify-content-center is-align-content-center is-align-items-center is-one-third has-text-centered">
+          <div class="is-inline-block is-relative summoner-icon"></div>
+        </div>
+        <div class="column is-flex is-flex-direction-column is-justify-content-center">
+          <div class="block top flex-grow flex-shrink username-wrapper">
+            <div class="username"></div>
+          </div>
+          <div class="block bottom flex-grow flex-shrink status-wrapper">
+            <div class="block is-hidden status">
+              <span class="is-inline-block dot"></span>
+              <span class="is-inline game-status"></span>
+            </div>
+            <div class="block is-hidden current-champion"></div>
+            <div class="block is-hidden buddies"></div>
+            <div class="block is-hidden current-map"></div>
+            <div class="block is-hidden current-mode"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="column is-half is-relative is-flex is-flex-direction-column is-justify-content-center summoner-stats-card">
+      <div class="block general-stats has-text-centered">
+        <div class="columns is-mobile is-gapless">
+          <div class="column is-one-third">
+            <div class="block title level">Nivel</div>
+            <div class="block value level"></div>
+          </div>
+          <div class="column is-one-third">
+            <div class="block title win-ratio">Win Rate</div>
+            <div class="block value win-ratio"></div>
+          </div>
+          <div class="column is-one-third">
+            <div class="block title kda">
+              <span class="is-inline">KDA • </span>
+              <span class="is-inline"></span>
+            </div>
+            <div class="block value kda"></div>
+          </div>
+        </div>
+      </div>
+      <div class="block recent-matches">
+        <div class="block title has-text-centered">Últimas partidas</div>
+        <ul class="history-list"></ul>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="is-block is-relative has-text-centered game-stats-card">
+  <div class="is-block is-relative in-game-stats">
+    {% for rowNum in[0, 1, 2, 3, 4] %}
+      <div class="columns is-mobile is-gapless players-row row-{{rowNum}}">
+        {% for team in["order", "chaos"] %}
+          <div class="column is-half {{team}} player">
+            <div class="is-block is-relative my-2 player-champion"></div>
+            <div class="columns is-mobile is-gapless is-align-content-center is-align-items-center">
+              <div class="column is-relative avatar">
+                <img src="" class="champion-avatar"/>
+                <div class="is-overlay respawn-timer"></div>
+              </div>
+              <div class="column flex-shrink is-flex-direction-column items-stats">
+                <div class="is-block is-relative">
+                  <div class="columns is-mobile is-gapless items">
+                    {% for item in[0, 1, 2] %}
+                      <div class="column slot item-{{item}}"></div>
+                    {% endfor %}
+                  </div>
+                  <div class="columns is-mobile is-gapless">
+                    {% for item in[3, 4, 5] %}
+                      <div class="column slot item-{{item}}"></div>
+                    {% endfor %}
+                  </div>
+                </div>
+              </div>
+              <div class="column flex-grow is-flex-direction-column player-stats">
+                <div class="columns is-mobile is-gapless">
+                  {% if team == "order" %}
+                    <div class="column is-relative stat title">KDA</div>
+                    <div class="column is-relative stat kills"></div>
+                    <div class="column is-relative stat deaths"></div>
+                    <div class="column is-relative stat assists"></div>
+                  {% else %}
+                    <div class="column is-relative stat kills"></div>
+                    <div class="column is-relative stat deaths"></div>
+                    <div class="column is-relative stat assists"></div>
+                    <div class="column is-relative stat title">KDA</div>
+                  {% endif %}
+                </div>
+                <div class="columns is-mobile is-gapless is-justify-content-space-between is-align-content-space-between">
+                  {% if team == "order" %}
+                    <div class="column is-relative stat title">Creeps</div>
+                    <div class="column is-relative stat creepScore"></div>
+                  {% else %}
+                    <div class="column is-relative stat creepScore"></div>
+                    <div class="column is-relative stat title">Creeps</div>
+                  {% endif %}
+                </div>
+                <div class="columns is-mobile is-gapless is-justify-content-space-between is-align-content-space-between">
+                  {% if team == "order" %}
+                    <div class="column is-relative stat title">Ward</div>
+                    <div class="column is-relative stat wardScore"></div>
+                  {% else %}
+                    <div class="column is-relative stat wardScore"></div>
+                    <div class="column is-relative stat title">Ward</div>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% endfor %}
+  </div>
+</div>

@@ -1,0 +1,66 @@
+// -- vars
+$default-size: 8vw
+$fill-size: $default-size / 16
+$level-factor: 2
+$level-size-factor: 3
+$level-font-size: ($fill-size * $level-factor) * 1.1
+$level-size: ($level-font-size / $level-factor) * $level-size-factor
+$sqf: 0.707106781
+$level-bw: $level-size * $sqf
+$empty-percent: 0
+$half-empty-percent: $empty-percent / 2
+$deg: 360deg / 100
+$percent-unit: ((100 - $empty-percent) / 100) * $deg
+$label-font-size: $default-size / 4
+$label-font-size-redo: $default-size * 4
+$border-width: $default-size / 45
+$champion-avatar-size: $default-size * 0.7
+$item-size: ($champion-avatar-size / 2)
+
+// -- colors
+$green: #72df76
+$blue: #72c5ea
+$red: #e1304a
+$border-color: #cecece
+
+// -- mixins
+@mixin _size($params...)
+  $width: nth($params, 1)
+  @if length($params) > 1
+    $height: nth($params, 2)
+    height: $height
+    min-height: $height
+    max-height: $height
+    width: $width
+    min-width: $width
+    max-width: $width
+  @else
+    height: $width
+    min-height: $width
+    max-height: $width
+    width: $width
+    min-width: $width
+    max-width: $width
+
+// -- fonts
+@font-face
+  font-family: 'PT Sans'
+  font-style: normal
+  font-weight: 400
+  font-display: swap
+  src: url('./fonts/PT_Sans_400.woff2') format('woff2')
+
+@font-face
+  font-family: 'PT Sans'
+  font-style: normal
+  font-weight: 700
+  font-display: swap
+  src: url('./fonts/PT_Sans_700.woff2') format('woff2')
+
+@mixin font-pt-sans-400()
+  font-family: 'PT Sans'
+  font-weight: 400
+
+@mixin font-pt-sans-700()
+  font-family: 'PT Sans'
+  font-weight: 700
