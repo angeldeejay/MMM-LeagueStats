@@ -403,7 +403,6 @@ Module.register("MMM-LeagueStats", {
     return [
       "moment.js",
       this.file("node_modules/jquery/dist/jquery.min.js"),
-      this.file("node_modules/jquery-ui/dist/jquery-ui.min.js"),
       this.file("node_modules/mqtt/dist/mqtt.min.js"),
       this.file("node_modules/deep-diff/dist/deep-diff.min.js")
     ];
