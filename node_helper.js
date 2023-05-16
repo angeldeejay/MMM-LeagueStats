@@ -215,7 +215,7 @@ module.exports = NodeHelper.create({
     const _new = data ?? null;
     if (this._hasChanged(_old, _new)) {
       this._cache[type] = _new;
-      if (!["inGame"].includes(this._cache.summoner.gameStatus)) {
+      if (!["inGame", "spectating"].includes(this._cache.summoner.gameStatus)) {
         if (!["championSelect"].includes(this._cache.summoner.gameStatus))
           this._cache.currentChampion = null;
         this._cache.players = null;
