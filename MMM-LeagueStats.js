@@ -145,15 +145,18 @@ Module.register("MMM-LeagueStats", {
             playerRow.find("." + k).text(score.toFixed(0));
           });
 
-          playerRow
-            .find(".player-champion")
-            .text(
-              player.skinName === "default"
-                ? player.championName
-                : `${player.skinName.replace(/(prestigios[ao]).+/gim, "$1")} (${
-                    player.championName
-                  })`
-            );
+          playerRow.find(".champion-name").text(player.championName);
+
+          const skinName =
+            player.skinName === "default"
+              ? null
+              : `${player.skinName.replace(/(prestigios[ao]).+/gim, "$1")}`;
+          if (skinName)
+            playerRow
+              .find(".champion-skin")
+              .removeClass("is-hidden")
+              .text(skinName);
+          else playerRow.find(".champion-skin").addClass("is-hidden").text("");
 
           for (let i = 0; i < 6; i++) {
             const item = player.items.find((item) => item.slot === i);

@@ -15,15 +15,33 @@
     height: 0px !important
 
   .wrapper
-    padding-top: 1rem
 
     &,
     *,
     *:before,
     *:after
       box-sizing: border-box
+      padding: 0
+      margin: 0
+
+    &
+      padding-top: 1rem
+
+    .columns
+      display: flex
+      &, & > .column
+        position: relative
 
     .summoner-profile-card
+      @include _size(55%, auto)
+      position: relative
+      display: flex
+      flex-direction: column
+      justify-content: center
+      flex-grow: 0
+      flex-shrink: 0
+      flex-basis: auto
+
       .summoner-level
         @include _size($default-size)
         display: block
@@ -33,24 +51,26 @@
         margin: 0 auto
         transform: rotate(180deg)
 
-        *,
-        *:before,
-        *:after
-          padding: 0
-          margin: 0
+      .summoner-icon-wrapper
+        display: flex
+        flex-direction: column
+        justify-content: center
+        align-content: center
+        align-items: center
+        @include _size($default-size + $item-size, auto)
 
-      .summoner-icon
-        @include _size($default-size)
-        overflow: hidden
-        border-radius: ($default-size / 2)
-        background-position: center center
-        background-repeat: no-repeat
-        background-size: cover
+        .summoner-icon
+          @include _size($default-size)
+          overflow: hidden
+          border-radius: ($default-size / 2)
+          background-position: center center
+          background-repeat: no-repeat
+          background-size: cover
 
       .username-wrapper
         font-size: $level-font-size * 1.5
         .username
-          font-weight: bold
+          font-weight: 700
           line-height: ($level-font-size * 1.5) + 0.5
 
       .bottom
@@ -60,10 +80,7 @@
           @include _size($level-font-size)
           border-radius: $level-font-size * 0.75
 
-        .status
-          font-size: $level-font-size * 1.15
-          line-height: $level-font-size * 1.35
-
+        .status,
         .current-champion,
         .buddies,
         .current-map,
@@ -72,7 +89,7 @@
           line-height: $level-font-size * 1.35
 
       .game-status
-        font-weight: bold
+        font-weight: 700
 
       .game-status
         color: $green
@@ -111,12 +128,17 @@
         display: none !important
 
     .title, .title.kda > span
-      font-weight: bold
+      font-weight: 700
       vertical-align: middle
 
     .summoner-stats-card
       font-size: $level-font-size * 1.15
       line-height: $level-font-size * 1.5
+      padding-right: $item-size / 2
+      position: relative
+      display: flex
+      flex-direction: column
+      justify-content: center
 
       .recent-matches
         margin-top: $fill-size
@@ -181,10 +203,51 @@
 
         .players-row
           .player
-            .player-champion
-              text-align: left
-              font-weight: bold
-              line-height: 2.25rem
+            .champion-wrapper
+              display: flex
+              flex-direction: row
+              flex-wrap: nowrap
+              justify-content: flex-start
+              align-items: stretch
+              align-content: stretch
+
+              .champion-name, .champion-skin
+                display: block
+                flex-basis: auto
+                align-self: auto
+                font-weight: 700
+                line-height: 2.25rem
+                order: 0
+
+            &.order .champion-wrapper
+              flex-direction: row
+
+              .champion-name, .champion-skin
+                text-align: left
+
+              .champion-skin
+                color: $blue
+
+              .champion-skin:before
+                content: "|"
+                text-align: center
+                display: inline-block
+                @include _size($item-size / 2, auto)
+
+            &.chaos .champion-wrapper
+              flex-direction: row-reverse
+
+              .champion-name, .champion-skin
+                text-align: right
+
+              .champion-skin
+                color: $blue
+
+              .champion-skin:after
+                content: "|"
+                text-align: center
+                display: inline-block
+                @include _size($item-size / 2, auto)
 
             .small-padder
               @include _size($item-size / 2, auto)
@@ -208,13 +271,13 @@
               background-size: cover
 
             .respawn-timer
-              font-weight: bold
+              font-weight: 700
               line-height: $champion-avatar-size
               font-size: $level-font-size * 2
 
             &.is-dead .champion-avatar
-              filter: blur(1vw)
-              opacity: 0.5
+              filter: blur($item-size / 6)
+              opacity: 0.75
 
             &:not(.is-dead) .respawn-timer
               display: none !important
@@ -237,13 +300,12 @@
               .deaths,
               .assists
                 &:before
-                  content: ''
+                  content: '/'
+                  font-weight: 700
                   display: block
                   position: absolute
-                  height: 1rem
-                  border-left: $border-width solid $border-color
-                  transform: rotate(15deg)
-                  top: ($level-font-size * 1.5) * 0.175
+                  left: -#{$border-width}
+                  opacity: 0.5
 
             &:first-child
               .player-stats .title
