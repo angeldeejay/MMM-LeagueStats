@@ -148,9 +148,10 @@ Module.register("MMM-LeagueStats", {
           playerRow
             .find(".player-champion")
             .text(
-              player.skinName === "default"
+              (player.skinName === "default"
                 ? player.championName
                 : player.skinName
+              ).replace(/(prestigios[ao]).+/gim, "$1")
             );
 
           for (let i = 0; i < 6; i++) {
