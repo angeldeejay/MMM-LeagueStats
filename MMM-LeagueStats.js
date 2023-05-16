@@ -165,7 +165,6 @@ Module.register("MMM-LeagueStats", {
               slot.removeAttr("style");
             }
           }
-          console.log(player);
         });
       });
     } else {
