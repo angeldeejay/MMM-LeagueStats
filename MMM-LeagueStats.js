@@ -27,14 +27,12 @@ Module.register("MMM-LeagueStats", {
       ...this.defaults,
       ...this.config
     };
-    // this.wrapper = this.$("<div />", { class: "wrapper is-hidden" });
-    this.wrapper = $("<div />", { class: "wrapper is-hidden" });
+    this.wrapper = Zepto("<div />", { class: "wrapper is-hidden" });
     this.debug("Loading template");
     this._loadTemplate().then(() => {
       this.info("Started");
       this.insertComponents();
     });
-
     setInterval(() => this._sendNotification("SET_CONFIG", this.config), 1000);
   },
 
@@ -133,13 +131,9 @@ Module.register("MMM-LeagueStats", {
             );
           playerRow
             .find(".champion-avatar")
-            .attr(
-              "src",
-              `/${this.name}/cdn/img/champion/tiles/` +
-                player.championAlias +
-                "_" +
-                player.skin +
-                ".jpg"
+            .css(
+              "background-image",
+              `url(/${this.name}/cdn/img/champion/tiles/${player.championAlias}_${player.skin}.jpg`
             );
           if (player.isDead) {
             playerRow.addClass("is-dead");
@@ -173,7 +167,9 @@ Module.register("MMM-LeagueStats", {
           }
         });
       });
+      this.wrapper.find(".game-stats-card").removeClass("is-hidden");
     } else {
+      this.wrapper.find(".game-stats-card").addClass("is-hidden");
       const gameStatsWrapper = this.wrapper.find(".in-game-stats");
       gameStatsWrapper.find(".is-dead").removeClass("is-dead");
       gameStatsWrapper.find(".player-champion").text("");
@@ -215,7 +211,7 @@ Module.register("MMM-LeagueStats", {
       const currentHistoryIds = [];
       const toDelete = [];
       const toAdd = [];
-      historyList.find("> li").each(function (_, li) {
+      historyList.find("li").each(function (_, li) {
         const item = $(li),
           gameId = item.data("gameId");
         if (receivedHistoryIds.includes(gameId)) {
@@ -317,9 +313,10 @@ Module.register("MMM-LeagueStats", {
           .find(".current-champion")
           .removeClass("is-hidden")
           .text(
-            currentChampion.currentSkin.name === "default"
+            (currentChampion.currentSkin.name === "default"
               ? currentChampion.alias
               : currentChampion.currentSkin.name
+            ).replace(/(prestigios[ao]).+/gim, "$1")
           );
       } else {
         this.wrapper.find(".current-champion").addClass("is-hidden").text("");
@@ -407,7 +404,7 @@ Module.register("MMM-LeagueStats", {
   getScripts() {
     return [
       "moment.js",
-      this.file("node_modules/jquery/dist/jquery.min.js"),
+      this.file("node_modules/zepto/dist/zepto.min.js"),
       this.file("node_modules/mqtt/dist/mqtt.min.js"),
       this.file("node_modules/deep-diff/dist/deep-diff.min.js")
     ];
@@ -433,6 +430,7 @@ Module.register("MMM-LeagueStats", {
       case "READY":
         if (!payload.version || !payload.ready) {
           this.wrapper.addClass("is-hidden");
+          this.wrapper.find(".game-stats-card").addClass("is-hidden");
           this._resetUi();
           break;
         }

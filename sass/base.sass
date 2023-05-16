@@ -1,4 +1,5 @@
 @import "helpers"
+@import "../node_modules/bulma/sass/utilities/mixins"
 
 .module.MMM-LeagueStats
   margin-bottom: 0
@@ -107,7 +108,6 @@
       .buddies,
       .current-map,
       .current-mode,
-      .game-stats-card
         display: none !important
 
     .title, .title.kda > span
@@ -184,19 +184,28 @@
             .player-champion
               text-align: left
               font-weight: bold
+              line-height: 2.25rem
+
+            .small-padder
+              @include _size($item-size / 2, auto)
 
             & > .columns, .items
               flex-direction: row
 
             &:last-child
               .player-champion
-                text-align: right
+                text-align: right !important
 
               > .columns, .items
                 flex-direction: row-reverse !important
 
-            .champion-avatar, .avatar
+            .avatar
               @include _size($champion-avatar-size)
+
+            .champion-avatar
+              background-position: center center
+              background-repeat: no-repeat
+              background-size: cover
 
             .respawn-timer
               font-weight: bold
@@ -204,8 +213,7 @@
               font-size: $level-font-size * 2
 
             &.is-dead .champion-avatar
-              filter: grayscale(1)
-              background-color: rgba(0, 0, 0, 1)
+              filter: blur(1vw)
               opacity: 0.5
 
             &:not(.is-dead) .respawn-timer
@@ -220,10 +228,11 @@
                 background-size: cover
 
             .player-stats
-              padding: 0 ($item-size / 3) !important
+              .kills, .deaths, .assists
+                @include _size($item-size, auto)
 
-              .title
-                @include _size($item-size * 1.75, $level-font-size * 1.5)
+              .wardScore, .creepScore
+                @include _size($item-size * 2, auto)
 
               .deaths,
               .assists
@@ -235,3 +244,11 @@
                   border-left: $border-width solid $border-color
                   transform: rotate(15deg)
                   top: ($level-font-size * 1.5) * 0.175
+
+            &:first-child
+              .player-stats .title
+                text-align: right !important
+
+            &:last-child
+              .player-stats .title
+                text-align: left !important

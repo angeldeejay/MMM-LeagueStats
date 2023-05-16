@@ -26,19 +26,19 @@ $border-color: #cecece
 // -- mixins
 @mixin _size($params...)
   $width: nth($params, 1)
+  $height: null
   @if length($params) > 1
     $height: nth($params, 2)
-    height: $height
+  @else
+    $height: $width
+
+  height: $height
+  @if $height != auto
     min-height: $height
     max-height: $height
-    width: $width
-    min-width: $width
-    max-width: $width
-  @else
-    height: $width
-    min-height: $width
-    max-height: $width
-    width: $width
+
+  width: $width
+  @if $width != auto
     min-width: $width
     max-width: $width
 

@@ -49,16 +49,16 @@
     </div>
   </div>
 </div>
-<div class="is-block is-relative has-text-centered game-stats-card">
+<div class="is-block is-relative has-text-centered is-hidden game-stats-card">
   <div class="is-block is-relative in-game-stats">
     {% for rowNum in[0, 1, 2, 3, 4] %}
       <div class="columns is-mobile is-gapless players-row row-{{rowNum}}">
         {% for team in["order", "chaos"] %}
           <div class="column is-half {{team}} player">
-            <div class="is-block is-relative my-2 player-champion"></div>
+            <div class="is-block is-relative player-champion"></div>
             <div class="columns is-mobile is-gapless is-align-content-center is-align-items-center">
               <div class="column is-relative avatar">
-                <img src="" class="champion-avatar"/>
+                <div class="is-overlay champion-avatar"/>
                 <div class="is-overlay respawn-timer"></div>
               </div>
               <div class="column flex-shrink is-flex-direction-column items-stats">
@@ -75,10 +75,11 @@
                   </div>
                 </div>
               </div>
-              <div class="column flex-grow is-flex-direction-column player-stats">
+              <div class="column flex-grow"></div>
+              <div class="column flex-shrink is-flex-direction-column player-stats">
                 <div class="columns is-mobile is-gapless">
                   {% if team == "order" %}
-                    <div class="column is-relative stat title">KDA</div>
+                    <div class="column is-relative flex-grow stat title">KDA</div>
                     <div class="column is-relative stat kills"></div>
                     <div class="column is-relative stat deaths"></div>
                     <div class="column is-relative stat assists"></div>
@@ -86,28 +87,29 @@
                     <div class="column is-relative stat kills"></div>
                     <div class="column is-relative stat deaths"></div>
                     <div class="column is-relative stat assists"></div>
-                    <div class="column is-relative stat title">KDA</div>
+                    <div class="column is-relative flex-grow stat title">KDA</div>
                   {% endif %}
                 </div>
                 <div class="columns is-mobile is-gapless is-justify-content-space-between is-align-content-space-between">
                   {% if team == "order" %}
-                    <div class="column is-relative stat title">Creeps</div>
+                    <div class="column is-relative flex-grow stat title">Creeps</div>
                     <div class="column is-relative stat creepScore"></div>
                   {% else %}
                     <div class="column is-relative stat creepScore"></div>
-                    <div class="column is-relative stat title">Creeps</div>
+                    <div class="column is-relative flex-grow stat title">Creeps</div>
                   {% endif %}
                 </div>
                 <div class="columns is-mobile is-gapless is-justify-content-space-between is-align-content-space-between">
                   {% if team == "order" %}
-                    <div class="column is-relative stat title">Ward</div>
+                    <div class="column is-relative flex-grow stat title">Ward</div>
                     <div class="column is-relative stat wardScore"></div>
                   {% else %}
                     <div class="column is-relative stat wardScore"></div>
-                    <div class="column is-relative stat title">Ward</div>
+                    <div class="column is-relative flex-grow stat title">Ward</div>
                   {% endif %}
                 </div>
               </div>
+              <div class="column small-padder"></div>
             </div>
           </div>
         {% endfor %}
