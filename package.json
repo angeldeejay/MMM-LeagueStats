@@ -1,24 +1,27 @@
 {
-  "name": "mmm-leaguestats",
-  "version": "1.0.0",
+  "name": "MMM-LeagueStats",
+  "version": "2.0.0",
   "description": "",
   "main": "MMM-LeagueStats.js",
   "devDependencies": {
-    "bulma": "^0.9.4",
-    "prettier": "^2.8.4"
+    "prettier": "^2.8.4",
+    "sass": "^1.100.0"
   },
   "scripts": {
-    "generate:assets": "node-sass --output-style compressed sass/_all.sass MMM-LeagueStats.css",
+    "generate:assets": "sass --no-source-map --style=compressed --load-path=. sass/_all.sass MMM-LeagueStats.css",
+    "watch:assets": "sass --watch --no-source-map --style=compressed --load-path=. sass/_all.sass:MMM-LeagueStats.css",
     "lint": "npm run generate:assets && prettier --check .",
     "lint:fix": "npm run generate:assets && prettier --write .",
     "test": "npm run generate:assets && npm run lint"
+  },
+  "sandbox": {
+    "startup": ["watch:assets"]
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
     "deep-diff": "^1.0.2",
-    "http-proxy-middleware": "^2.0.6",
     "mqtt": "^4.3.7",
     "zepto": "^1.2.0"
   }

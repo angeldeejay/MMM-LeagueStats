@@ -1,21 +1,19 @@
 @import "helpers"
-@import "../node_modules/bulma/sass/utilities/mixins"
 
 .module.MMM-LeagueStats
   margin-bottom: 0
-  background-color: rgba(0, 0, 0, 0.85)
 
   .module-header
     display: none !important
-    visibility: hidden !important
-    position: absolute !important
-    top: 0 !important
-    left: 0 !important
-    width: 0px !important
-    height: 0px !important
 
+  .MMM-LeagueStats-warning
+    padding: 1rem
+    font-weight: 700
+    color: #ffb74d
+
+  // Pinned to the viewport so the rows stay vertically centered regardless
+  // of where the module sits in the layout.
   .wrapper
-
     &,
     *,
     *:before,
@@ -24,293 +22,151 @@
       padding: 0
       margin: 0
 
-    &
-      padding-top: 1rem
+    position: fixed
+    inset: 0
+    background-color: rgba(0, 0, 0, 0.9)
+    padding: ($fill-size * 2)
+    display: flex
+    flex-direction: column
+    justify-content: center
 
-    .columns
-      display: flex
-      &, & > .column
-        position: relative
+    &.is-hidden
+      display: none
 
-    .summoner-profile-card
-      @include _size(55%, auto)
-      position: relative
-      display: flex
-      flex-direction: column
-      justify-content: center
-      flex-grow: 0
-      flex-shrink: 0
-      flex-basis: auto
+  .game-stats-card
+    font-size: $level-font-size
+    line-height: 1.2
 
-      .summoner-level
-        @include _size($default-size)
-        display: block
-        position: relative
-        clear: both
-        text-align: center
-        margin: 0 auto
-        transform: rotate(180deg)
+    &.is-hidden
+      display: none
 
-      .summoner-icon-wrapper
-        display: flex
-        flex-direction: column
-        justify-content: center
-        align-content: center
-        align-items: center
-        @include _size($default-size + $item-size, auto)
+  .in-game-stats
+    display: flex
+    flex-direction: column
+    gap: ($fill-size * 3)
 
-        .summoner-icon
-          @include _size($default-size)
-          overflow: hidden
-          border-radius: ($default-size / 2)
-          background-position: center center
-          background-repeat: no-repeat
-          background-size: cover
+  // one row per role: order player on the left, chaos on the right
+  .players-row
+    display: flex
+    flex-direction: row
+    gap: $item-size
 
-      .username-wrapper
-        font-size: $level-font-size * 1.5
-        .username
-          font-weight: 700
-          line-height: ($level-font-size * 1.5) + 0.5
+    &.is-hidden
+      display: none
 
-      .bottom
-        font-size: $level-font-size * 1.1
-        line-height: $level-font-size * 1.2
-        .dot
-          @include _size($level-font-size)
-          border-radius: $level-font-size * 0.75
+  .player
+    flex: 1 1 0
+    min-width: 0
+    display: flex
+    flex-direction: column
+    gap: $fill-size
 
-        .status,
-        .current-champion,
-        .buddies,
-        .current-map,
-        .current-mode
-          font-size: $level-font-size * 1.15
-          line-height: $level-font-size * 1.35
-
-      .game-status
-        font-weight: 700
-
-      .game-status
-        color: $green
-
-      .dot
-        background-color: $green
-
-    &.away
-      .game-status
-        color: $red !important
-
-      .dot
-        background-color: $red !important
-
-    &.champion-select,
-    &.in-game,
-    &.in-queue,
-    &.spectating
-      .game-status
-        color: $blue !important
-
-      .dot
-        background-color: $blue !important
-
-    &.in-game,
-    &.in-queue,
-    &.spectating
-      .hide-in-game
-        display: none !important
-        border: 0 !important
-
-    &:not(.in-game):not(.spectating)
-      .buddies,
-      .current-map,
-      .current-mode,
-        display: none !important
-
-    .title, .title.kda > span
+    .champion-name
       font-weight: 700
-      vertical-align: middle
+      line-height: 1.5
+      white-space: nowrap
+      overflow: hidden
+      text-overflow: ellipsis
+      text-align: left
 
-    .summoner-stats-card
-      font-size: $level-font-size * 1.15
-      line-height: $level-font-size * 1.5
-      padding-right: $item-size / 2
+    // avatar | items | KDA, laid out beside the player
+    .player-body
+      display: flex
+      flex-direction: row
+      align-items: center
+      gap: ($fill-size * 3)
+
+    // rectangular splash — 16:9
+    .avatar
       position: relative
+      flex: 0 0 auto
+      @include _size($champion-avatar-size * 16 / 9, $champion-avatar-size)
+
+    .champion-avatar
+      position: absolute
+      inset: 0
+      background-position: center center
+      background-repeat: no-repeat
+      background-size: cover
+
+    .respawn-timer
+      position: absolute
+      inset: 0
+      display: flex
+      align-items: center
+      justify-content: center
+      font-weight: 700
+      font-size: ($level-font-size * 1.6)
+
+    &:not(.is-dead) .respawn-timer
+      display: none
+
+    // dead — desaturated + blurred splash, greyed items (matches riot-monitor)
+    &.is-dead .champion-avatar
+      filter: blur(5px) grayscale(0.9)
+      opacity: 0.5
+
+    &.is-dead .items
+      filter: grayscale(0.9)
+
+    // 6 item slots in a single row
+    .items
+      flex: 0 0 auto
+      display: flex
+      flex-direction: row
+      gap: $fill-size
+
+    .slot
+      @include _size($item-size)
+      background-color: rgba(255, 255, 255, 0.06)
+      background-position: center center
+      background-repeat: no-repeat
+      background-size: cover
+
+    // KDA stacked vertically beside the player — 3 cells span the tile height
+    .kda
+      flex: 0 0 auto
       display: flex
       flex-direction: column
       justify-content: center
 
-      .recent-matches
-        margin-top: $fill-size
+    .stat
+      display: flex
+      flex-direction: row
+      align-items: center
+      gap: 0.4em
+      // each cell is a third of the tile; line-height fills the cell, the
+      // font itself stays content-sized
+      height: ($champion-avatar-size / 3)
+      line-height: ($champion-avatar-size / 3)
 
-        .history-list
-          user-select: none
-          list-style: none
-          padding: 0
-          text-align: center
-          white-space: nowrap
-          break-inside: avoid
-          overflow: hidden
-          margin: $fill-size auto 0
+      .lbl
+        font-weight: 700
+        font-size: 0.78em
+        opacity: 0.5
 
-          & > li
-            position: relative
-            list-style: none
-            width: $level-font-size * 2.25
-            height: $level-font-size * 2.25
-            border-width: $border-width
-            border-style: solid
-            border-radius: 50%
-            overflow: hidden
+      .v
+        font-weight: 700
+        min-width: 1.6em
+        text-align: left
 
-          & > li:not(:last-child)
-            margin-right: calc(1rem / 3) !important
+    .kills .v
+      color: $green
+    .deaths .v
+      color: $red
+    .assists .v
+      color: $blue
 
-          & > li img
-            position: absolute
-            width: 2rem
-            height: 2rem
-            margin-left: 50%
-            margin-top: 50%
-            max-width: unset
-            min-width: unset
-            max-height: unset
-            min-height: unset
-            transform: translate(-50%, -50%)
+    // the chaos side mirrors the order side
+    &.chaos
+      .champion-name
+        text-align: right
 
-          & > li.won
-            border-color: $green
+      .player-body
+        flex-direction: row-reverse
 
-          & > li.lost
-            border-color: $red
+      .stat
+        flex-direction: row-reverse
 
-    .game-stats-card
-      font-size: $level-font-size * 1.15
-      line-height: $level-font-size * 1.25
-      padding: 0 $level-font-size
-
-      *
-        margin: 0
-        padding: 0
-
-      .in-game-stats
-        & > .columns
-          margin-left: 0
-          margin-right: 0
-          margin-top: 0
-          margin-bottom: 0
-          padding: 0
-
-        .players-row
-          .player
-            .champion-wrapper
-              display: flex
-              flex-direction: row
-              flex-wrap: nowrap
-              justify-content: flex-start
-              align-items: stretch
-              align-content: stretch
-
-              .champion-name, .champion-skin
-                display: block
-                flex-basis: auto
-                align-self: auto
-                font-weight: 700
-                line-height: 2.25rem
-                order: 0
-
-            &.order .champion-wrapper
-              flex-direction: row
-
-              .champion-name, .champion-skin
-                text-align: left
-
-              .champion-skin
-                color: $blue
-
-              .champion-skin:before
-                content: "|"
-                text-align: center
-                display: inline-block
-                @include _size($item-size / 2, auto)
-
-            &.chaos .champion-wrapper
-              flex-direction: row-reverse
-
-              .champion-name, .champion-skin
-                text-align: right
-
-              .champion-skin
-                color: $blue
-
-              .champion-skin:after
-                content: "|"
-                text-align: center
-                display: inline-block
-                @include _size($item-size / 2, auto)
-
-            .small-padder
-              @include _size($item-size / 2, auto)
-
-            & > .columns, .items
-              flex-direction: row
-
-            &:last-child
-              .player-champion
-                text-align: right !important
-
-              > .columns, .items
-                flex-direction: row-reverse !important
-
-            .avatar
-              @include _size($champion-avatar-size)
-
-            .champion-avatar
-              background-position: center center
-              background-repeat: no-repeat
-              background-size: cover
-
-            .respawn-timer
-              font-weight: 700
-              line-height: $champion-avatar-size
-              font-size: $level-font-size * 2
-
-            &.is-dead .champion-avatar
-              filter: blur($item-size / 6)
-              opacity: 0.75
-
-            &:not(.is-dead) .respawn-timer
-              display: none !important
-
-            .items-stats
-              @include _size($item-size * 3, $item-size * 2)
-              .slot
-                @include _size($item-size)
-                background-position: center center
-                background-repeat: no-repeat
-                background-size: cover
-
-            .player-stats
-              .kills, .deaths, .assists
-                @include _size($item-size, auto)
-
-              .wardScore, .creepScore
-                @include _size($item-size * 2, auto)
-
-              .deaths,
-              .assists
-                &:before
-                  content: '/'
-                  font-weight: 700
-                  display: block
-                  position: absolute
-                  left: -#{$border-width}
-                  opacity: 0.5
-
-            &:first-child
-              .player-stats .title
-                text-align: right !important
-
-            &:last-child
-              .player-stats .title
-                text-align: left !important
+        .v
+          text-align: right

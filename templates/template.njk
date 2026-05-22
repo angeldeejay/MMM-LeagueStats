@@ -1,119 +1,27 @@
-<div class="is-block is-relative">
-  <div class="columns">
-    <div class="column is-flex-grow-0  is-flex-shrink-0 is-hidden summoner-profile-card">
-      <div class="columns is-relative">
-        <div class="column is-flex-grow-0 is-flex-shrink-1 summoner-icon-wrapper">
-          <div class="is-inline-block is-relative summoner-icon"></div>
-        </div>
-        <div class="column is-flex is-flex-direction-column is-justify-content-center">
-          <div class="block top is-flex-grow-0 is-flex-shrink-1 username-wrapper">
-            <div class="username"></div>
-          </div>
-          <div class="block bottom is-flex-grow-1 is-flex-shrink-0 status-wrapper">
-            <div class="block is-hidden status">
-              <span class="is-inline-block dot"></span>
-              <span class="is-inline game-status"></span>
-            </div>
-            <div class="block is-hidden current-champion"></div>
-            <div class="block is-hidden buddies"></div>
-            <div class="block is-hidden current-map"></div>
-            <div class="block is-hidden current-mode"></div>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="column is-flex is-flex-grow-1 is-flex-shrink-0"></div>
-    <div class="column summoner-stats-card">
-      <div class="block general-stats has-text-centered">
-        <div class="columns">
-          <div class="column is-one-third">
-            <div class="block title level">Nivel</div>
-            <div class="block value level"></div>
-          </div>
-          <div class="column is-one-third">
-            <div class="block title win-ratio">Win Rate</div>
-            <div class="block value win-ratio"></div>
-          </div>
-          <div class="column is-one-third">
-            <div class="block title kda">
-              <span class="is-inline">KDA • </span>
-              <span class="is-inline"></span>
-            </div>
-            <div class="block value kda"></div>
-          </div>
-        </div>
-      </div>
-      <div class="block recent-matches">
-        <div class="block title has-text-centered">Últimas partidas</div>
-        <ul class="history-list"></ul>
-      </div>
-    </div>
-  </div>
-</div>
-<div class="is-block is-relative has-text-centered is-hidden game-stats-card">
-  <div class="is-block is-relative in-game-stats">
-    {% for rowNum in[0, 1, 2, 3, 4] %}
-      <div class="columns players-row row-{{rowNum}}">
-        {% for team in["order", "chaos"] %}
-          <div class="column is-half {{team}} player">
-            <div class="is-block is-relative">
-              <div class="champion-wrapper">
-                <div class="champion-name"></div>
-                <div class="champion-skin"></div>
-              </div>
-            </div>
-            <div class="columns is-align-content-center is-align-items-center">
-              <div class="column is-relative avatar">
-                <div class="is-overlay champion-avatar"/>
-                <div class="is-overlay respawn-timer"></div>
-              </div>
-              <div class="column flex-shrink is-flex-direction-column items-stats">
-                <div class="is-block is-relative">
-                  <div class="columns items">
-                    {% for item in[0, 1, 2] %}
-                      <div class="column slot item-{{item}}"></div>
-                    {% endfor %}
-                  </div>
-                  <div class="columns">
-                    {% for item in[3, 4, 5] %}
-                      <div class="column slot item-{{item}}"></div>
-                    {% endfor %}
-                  </div>
+<div class="game-stats-card is-hidden">
+  <div class="in-game-stats">
+    {% for row in [0, 1, 2, 3, 4, 5] %}
+      <div class="players-row row-{{ row }} is-hidden">
+        {% for team in ["order", "chaos"] %}
+          <div class="player {{ team }}">
+            <div class="champion-name"></div>
+            <div class="player-body">
+              <div class="avatar">
+                <div class="champion-avatar"></div>
+                <div class="respawn-timer">
+                  <i class="fa-solid fa-skull"></i>
                 </div>
               </div>
-              <div class="column flex-grow"></div>
-              <div class="column flex-shrink is-flex-direction-column player-stats">
-                <div class="columns">
-                  {% if team == "order" %}
-                    <div class="column is-relative flex-grow stat title">KDA</div>
-                  {% endif %}
-                  <div class="column is-relative stat kills"></div>
-                  <div class="column is-relative stat deaths"></div>
-                  <div class="column is-relative stat assists"></div>
-                  {% if team == "chaos" %}
-                    <div class="column is-relative flex-grow stat title">KDA</div>
-                  {% endif %}
-                </div>
-                <div class="columns is-justify-content-space-between is-align-content-space-between">
-                  {% if team == "order" %}
-                    <div class="column is-relative flex-grow stat title">Creeps</div>
-                    <div class="column is-relative stat creepScore"></div>
-                  {% else %}
-                    <div class="column is-relative stat creepScore"></div>
-                    <div class="column is-relative flex-grow stat title">Creeps</div>
-                  {% endif %}
-                </div>
-                <div class="columns is-justify-content-space-between is-align-content-space-between">
-                  {% if team == "order" %}
-                    <div class="column is-relative flex-grow stat title">Ward</div>
-                    <div class="column is-relative stat wardScore"></div>
-                  {% else %}
-                    <div class="column is-relative stat wardScore"></div>
-                    <div class="column is-relative flex-grow stat title">Ward</div>
-                  {% endif %}
-                </div>
+              <div class="items">
+                {% for i in [0, 1, 2, 3, 4, 5] %}
+                  <div class="slot item-{{ i }}"></div>
+                {% endfor %}
               </div>
-              <div class="column small-padder"></div>
+              <div class="kda">
+                <div class="stat kills"><span class="lbl">K</span><span class="v"></span></div>
+                <div class="stat deaths"><span class="lbl">D</span><span class="v"></span></div>
+                <div class="stat assists"><span class="lbl">A</span><span class="v"></span></div>
+              </div>
             </div>
           </div>
         {% endfor %}

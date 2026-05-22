@@ -3,200 +3,226 @@ const Log = require("logger");
 const path = require("path");
 const mqtt = require("mqtt");
 const DeepDiff = require("deep-diff");
-const { createProxyMiddleware } = require("http-proxy-middleware");
-const { networkInterfaces } = require("os");
 
-const nets = networkInterfaces();
-const results = Object.create(null); // Or just '{}', an empty object
+// riot-exposer publishes one retained MQTT topic with the whole LCU client
+// state. NestJS wraps the payload as { pattern, data }.
+const STATE_TOPIC = "data.state.updated";
 
-for (const name of Object.keys(nets)) {
-  for (const net of nets[name]) {
-    // Skip over non-IPv4 and internal (i.e. 127.0.0.1) addresses
-    // 'IPv4' is in Node <= 17, from 18 it's a number 4 or 6
-    const familyV4Value = typeof net.family === "string" ? "IPv4" : 4;
-    if (net.family === familyV4Value && !net.internal) {
-      if (!results[name]) {
-        results[name] = [];
-      }
-      results[name].push(net.address);
-    }
-  }
-}
-console.log(results);
+// DDragon — only used to resolve championId -> alias/name for display and for
+// the riot-monitor asset URLs. One lazy fetch per process, no daemon.
+const DDRAGON = "https://ddragon.leagueoflegends.com";
+
+// The module only does work while a live match is running.
+const IN_GAME_PHASES = ["GameStart", "InProgress", "Reconnect"];
 
 module.exports = NodeHelper.create({
   name: path.basename(__dirname),
   logPrefix: `${path.basename(__dirname)} ::`,
-  _cache: {
-    summoner: null,
-    events: null,
-    players: null,
-    history: null,
-    stats: null,
-    currentGame: null,
-    currentChampion: null
-  },
+
   client: null,
+  config: null,
+
   ready: false,
-  connected: false,
-  version: null,
-  lastTs: 0,
+  _cache: null,
+
+  // championId -> { alias, name } — lazy, in-memory, fetched once per process.
+  _champions: null,
+  _ddragonLoading: null,
+  _ddVersion: null,
+  // alias -> { skinNum: skinName } — fetched per champion on demand, cached.
+  _championDetail: {},
+  _detailLoading: {},
 
   start() {
     this.log("Starting");
-
-    // Inactivity
+    this._cache = { players: null };
+    // Heartbeat: re-sync a freshly (re)loaded front mirror.
     setInterval(() => {
-      if (this._now() - this.lastTs > 750 && this.ready === true) {
-        this.ready = false;
-      }
-      this._sendNotification("READY", {
-        ready: this.ready,
-        version: this.version
-      });
-    }, 100);
-
-    setInterval(() => {
-      if (this.ready) {
-        this._sendNotification("UPDATE", this._cache);
-      } else {
-        this.version = null;
-        this._cache = {
-          summoner: null,
-          events: null,
-          players: null,
-          history: null,
-          stats: null,
-          currentGame: null,
-          currentChampion: null
-        };
-      }
-    }, 100);
-
-    this.setProxy();
+      this._sendNotification("READY", { ready: this.ready });
+      if (this.ready) this._sendNotification("UPDATE", this._cache);
+    }, 1000);
     this.log("Started");
   },
 
-  _now: () => new Date().getTime(),
+  // ── DDragon (lazy champion lookup) ────────────────────────────────────────
+
+  _loadDDragon() {
+    if (this._champions) return Promise.resolve();
+    if (this._ddragonLoading) return this._ddragonLoading;
+
+    this._ddragonLoading = (async () => {
+      const versions = await fetch(`${DDRAGON}/api/versions.json`).then((r) =>
+        r.json()
+      );
+      this._ddVersion = versions[0];
+      const champ = await fetch(
+        `${DDRAGON}/cdn/${this._ddVersion}/data/en_US/champion.json`
+      ).then((r) => r.json());
+      const map = {};
+      for (const c of Object.values(champ.data)) {
+        map[parseInt(c.key, 10)] = { alias: c.id, name: c.name };
+      }
+      this._champions = map;
+      this.log(`DDragon loaded — ${Object.keys(map).length} champions`);
+    })().catch((err) => {
+      this.error("DDragon load failed", err);
+      this._ddragonLoading = null; // allow a retry on the next payload
+      throw err;
+    });
+
+    return this._ddragonLoading;
+  },
+
+  _champ(id) {
+    return (this._champions && this._champions[id]) || { alias: "None", name: "—" };
+  },
+
+  // Per-champion skin names — DDragon detail file, fetched once per alias.
+  _loadDetail(alias) {
+    if (alias === "None" || this._championDetail[alias]) return Promise.resolve();
+    if (this._detailLoading[alias]) return this._detailLoading[alias];
+
+    this._detailLoading[alias] = (async () => {
+      const doc = await fetch(
+        `${DDRAGON}/cdn/${this._ddVersion}/data/en_US/champion/${alias}.json`
+      ).then((r) => r.json());
+      const champ = doc.data && doc.data[alias];
+      const skins = {};
+      if (champ && Array.isArray(champ.skins)) {
+        for (const sk of champ.skins) skins[sk.num] = sk.name;
+      }
+      this._championDetail[alias] = skins;
+    })().catch((err) => {
+      this.error(`DDragon detail ${alias} failed`, err);
+      delete this._detailLoading[alias];
+      throw err;
+    });
+
+    return this._detailLoading[alias];
+  },
+
+  // Resolve a skin id to its display name — the skin name, or the champion
+  // name for the base skin (DDragon names skin 0 "default"). The trailing
+  // chroma suffix — e.g. "Worldbreaker Sion (Obsidian)" — is stripped.
+  _skinLabel(alias, championName, skinNum) {
+    const name = (this._championDetail[alias] || {})[skinNum];
+    if (!name || name.toLowerCase() === "default") return championName;
+    return name.replace(/\s*\([^)]*\)\s*$/, "").trim() || championName;
+  },
+
+  // ── MQTT ──────────────────────────────────────────────────────────────────
 
   connectToBroker() {
     const url = `mqtt://${this.config.broker}:${this.config.port}`;
-    const options = {
-      clean: true,
-      connectTimeout: 4000
-    };
-
     if (this.client !== null) {
       try {
-        this.client.end();
+        this.client.end(true);
       } catch (_) {}
-      delete this.client;
       this.client = null;
     }
 
-    this.client = mqtt.connect(url, options);
+    this.log(`Connecting to ${url}`);
+    this.client = mqtt.connect(url, {
+      clean: true,
+      connectTimeout: 4000,
+      reconnectPeriod: 2000
+    });
+
     this.client.on("connect", () => {
       this.debug("mqtt-connect");
-      this.connected = true;
-      // Subscribe to a topic
-      this.client.subscribe("lcu/+");
-      this.client.subscribe("lcu/live/+");
+      this.client.subscribe(STATE_TOPIC);
     });
-
-    this.client.on("error", (..._) => {
-      this.connected = false;
-      this.debug("mqtt-error");
-    });
-    this.client.on("reconnect", () => {
-      this.connected = false;
-      this.debug("mqtt-reconnect");
-    });
-    this.client.on("offline", () => {
-      this.connected = false;
-      this.debug("mqtt-offline");
-    });
-    this.client.on("end", () => {
-      this.connected = false;
-      this.debug("mqtt-end");
-    });
-    this.client.on("close", () => {
-      this.connected = false;
-      this.debug("mqtt-close");
-    });
-
-    // Receive messages
-    this.client.on("message", (topic, message) => {
-      let data;
-      try {
-        data = JSON.parse(message.toString());
-        if (typeof data === "undefined" || data == null) throw "no-data";
-
-        switch (topic) {
-          case "lcu/live/summoner":
-            this._cache.summoner =
-              typeof data !== "undefined" && data ? data : null;
-            break;
-          case "lcu/instance":
-            this.online =
-              typeof data.status !== "undefined" && data.status === true;
-            break;
-          case "lcu/client":
-            this.version =
-              typeof data.version === "string" && data.version.trim().length > 0
-                ? data.version
-                : null;
-            break;
-        }
-        this.ready =
-          this.connected === true &&
-          this.version !== null &&
-          this._cache.summoner !== null;
-      } catch (_) {}
-
-      if (!this.ready) {
-        this._cache = {
-          summoner: null,
-          events: null,
-          players: null,
-          history: null,
-          stats: null,
-          currentGame: null,
-          currentChampion: null
-        };
-
-        return;
-      }
-      this.lastTs = this._now();
-
-      if (topic.startsWith("lcu/live/")) {
-        const type = topic
-          .replace("lcu/live/", "")
-          .replace(/-(\w|$)/g, (_, x) => x.toUpperCase());
-
-        this._update(
-          type,
-          data !== "undefined" && data !== null && data !== false ? data : null
-        );
-      }
-    });
+    ["error", "reconnect", "offline", "close", "end"].forEach((ev) =>
+      this.client.on(ev, () => this.debug(`mqtt-${ev}`))
+    );
+    this.client.on("message", (topic, message) =>
+      this._onMessage(topic, message)
+    );
   },
 
-  // Logging wrapper
-  log(...args) {
-    Log.log(this.logPrefix, ...args);
+  _onMessage(topic, message) {
+    if (topic !== STATE_TOPIC) return;
+    let envelope;
+    try {
+      envelope = JSON.parse(message.toString());
+    } catch (_) {
+      return;
+    }
+    // NestJS MQTT transport wraps payloads as { pattern, data }.
+    const data =
+      envelope && typeof envelope === "object" && "data" in envelope
+        ? envelope.data
+        : envelope;
+    if (!data || typeof data !== "object") return;
+    this._handleState(data);
   },
-  info(...args) {
-    Log.info(this.logPrefix, ...args);
+
+  async _handleState(d) {
+    const inGame =
+      d.connected === true && IN_GAME_PHASES.includes(d.phase);
+
+    if (!inGame) {
+      if (this.ready) this.log("Match ended — going idle");
+      this.ready = false;
+      this._cache = { players: null };
+      this._sendNotification("READY", { ready: false });
+      return;
+    }
+
+    try {
+      await this._loadDDragon();
+    } catch (_) {
+      return; // cannot resolve champions yet; retry on next payload
+    }
+
+    // Prefetch skin names for every champion in the match (cached per alias).
+    const aliases = [
+      ...new Set(
+        (d.players || []).map((p) => this._champ(p.championId).alias)
+      )
+    ];
+    await Promise.allSettled(aliases.map((a) => this._loadDetail(a)));
+
+    this._cache = { players: this._mapPlayers(d.players || []) };
+    this.ready = true;
+    this._sendNotification("READY", { ready: true });
+    this._sendNotification("UPDATE", this._cache);
   },
-  debug(...args) {
-    Log.debug(this.logPrefix, ...args);
+
+  // ── transform: LCUClientData.players -> front grid shape ──────────────────
+  // Players are grouped by team (template classes order/chaos). Raw data only
+  // — the front builds the riot-monitor asset URLs and owns image caching.
+  // Fields absent from the LCU payload (creep/ward score, respawn timer)
+  // degrade to neutral values.
+
+  _mapPlayers(players) {
+    const teams = {};
+    for (const p of players) {
+      const team = (p.team || "UNKNOWN").toString();
+      const champ = this._champ(p.championId);
+      const skinNum = (p.skinId || 0) % 1000;
+      const s = p.scores || {};
+      (teams[team] = teams[team] || []).push({
+        championAlias: champ.alias,
+        // riot-monitor shows the skin name as the player's label.
+        championName: this._skinLabel(champ.alias, champ.name, skinNum),
+        skinNum,
+        isDead: p.dead === true,
+        scores: {
+          kills: s.kills || 0,
+          deaths: s.deaths || 0,
+          assists: s.assists || 0
+        },
+        items: (p.items || []).map((it) => ({
+          slot: it.slot,
+          itemID: it.itemID
+        }))
+      });
+    }
+    return teams;
   },
-  error(...args) {
-    Log.error(this.logPrefix, ...args);
-  },
-  warning(...args) {
-    Log.warn(this.logPrefix, ...args);
-  },
+
+  // ── notifications ─────────────────────────────────────────────────────────
 
   _hasChanged(o, n) {
     return (
@@ -208,21 +234,6 @@ module.exports = NodeHelper.create({
       !n ||
       typeof DeepDiff(o, n) !== "undefined"
     );
-  },
-
-  _update(type, data) {
-    const _old = this._cache[type] ?? null;
-    const _new = data ?? null;
-    if (this._hasChanged(_old, _new)) {
-      this._cache[type] = _new;
-      if (!["inGame", "spectating"].includes(this._cache.summoner.gameStatus)) {
-        if (!["championSelect"].includes(this._cache.summoner.gameStatus))
-          this._cache.currentChampion = null;
-        this._cache.players = null;
-        this._cache.currentGame = null;
-        this._cache.events = null;
-      }
-    }
   },
 
   _sendNotification(notification, payload) {
@@ -245,28 +256,28 @@ module.exports = NodeHelper.create({
     }
   },
 
-  // Socket Notification Received
-  socketNotificationReceived: function (notification, payload) {
+  socketNotificationReceived(notification, payload) {
     this._notificationReceived(
       notification.replace(new RegExp(`${this.name}-`, "gi"), ""),
       payload
     );
   },
 
-  setProxy() {
-    const proxy = createProxyMiddleware({
-      target: "https://ddragon.leagueoflegends.com",
-      changeOrigin: true,
-      pathRewrite: {
-        [`/${this.name}/cdn`]: "/cdn"
-      },
-      onProxyReq: (proxyReq, req, ..._) => {
-        req.headers["cache-control"] = undefined;
-        req.headers.pragma = undefined;
-        proxyReq.removeHeader("Cache-Control");
-        proxyReq.removeHeader("Pragma");
-      }
-    });
-    this.expressApp.use(`/${this.name}/cdn`, proxy);
+  // ── logging ───────────────────────────────────────────────────────────────
+
+  log(...args) {
+    Log.log(this.logPrefix, ...args);
+  },
+  info(...args) {
+    Log.info(this.logPrefix, ...args);
+  },
+  debug(...args) {
+    Log.debug(this.logPrefix, ...args);
+  },
+  error(...args) {
+    Log.error(this.logPrefix, ...args);
+  },
+  warning(...args) {
+    Log.warn(this.logPrefix, ...args);
   }
 });

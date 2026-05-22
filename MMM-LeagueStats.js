@@ -1,34 +1,40 @@
-/* global Module Log */
+/* global Module Log Zepto */
 
 Module.register("MMM-LeagueStats", {
   name: "MMM-LeagueStats",
   logPrefix: "MMM-LeagueStats ::",
   template: null,
   defaults: {
-    broker: "127.0.0.1",
+    broker: "192.168.0.2",
     port: 1883
+    // riotMonitorUrl is REQUIRED — the riot-monitor base URL that serves
+    // champion tiles and item icons. It has no default: the module refuses
+    // to start without it (see start() / getDom()).
   },
   wrapper: null,
-  $: null,
-  version: null,
-  _cache: {
-    summoner: null,
-    events: null,
-    players: null,
-    history: null,
-    stats: null,
-    currentGame: null,
-    currentChampion: null
-  },
+  disabled: false,
+  _cache: { players: null },
+  // URLs of images already fetched — lets us swap background-image without a
+  // flash/refetch (the champion tile never changes mid-game; items rarely do).
+  _imgCache: null,
 
   start() {
-    this.info(`Starting`);
-    this.config = {
-      ...this.defaults,
-      ...this.config
-    };
+    this.info("Starting");
+    this.config = { ...this.defaults, ...this.config };
+
+    // riotMonitorUrl is mandatory — without it the module cannot resolve any
+    // asset. Refuse to start and surface a warning instead of a broken UI.
+    if (
+      typeof this.config.riotMonitorUrl !== "string" ||
+      !this.config.riotMonitorUrl.trim()
+    ) {
+      this.disabled = true;
+      this.error("'riotMonitorUrl' is required — module disabled");
+      return;
+    }
+
+    this._imgCache = new Set();
     this.wrapper = Zepto("<div />", { class: "wrapper is-hidden" });
-    this.debug("Loading template");
     this._loadTemplate().then(() => {
       this.info("Started");
       this.insertComponents();
@@ -36,7 +42,36 @@ Module.register("MMM-LeagueStats", {
     setInterval(() => this._sendNotification("SET_CONFIG", this.config), 1000);
   },
 
-  _now: () => new Date().getTime(),
+  // riot-monitor base URL — guaranteed present (start() bails without it).
+  _assetBase() {
+    return this.config.riotMonitorUrl.trim().replace(/\/+$/, "");
+  },
+
+  // Set an element's background-image without flicker: skip if unchanged,
+  // otherwise preload the image and only swap once it is decoded.
+  _setBg(el, url) {
+    if (el.data("bg") === url) return;
+    const apply = () => {
+      el.css("background-image", `url(${url})`);
+      el.data("bg", url);
+    };
+    if (this._imgCache.has(url)) {
+      apply();
+      return;
+    }
+    const img = new Image();
+    img.onload = () => {
+      this._imgCache.add(url);
+      apply();
+    };
+    img.src = url;
+  },
+
+  _clearBg(el) {
+    if (el.data("bg") === null || el.data("bg") === undefined) return;
+    el.removeAttr("style");
+    el.data("bg", null);
+  },
 
   _hasChanged(o, n) {
     return (
@@ -50,71 +85,22 @@ Module.register("MMM-LeagueStats", {
     );
   },
 
-  _updateSummoner() {
-    const { summoner } = this._cache;
-    if (summoner) {
-      if (summoner.profileIcon) {
-        this.wrapper
-          .find(".summoner-icon")
-          .css(
-            "background-image",
-            `url(/${this.name}/cdn/${this.version}/img/profileicon/${summoner.profileIcon}.png)`
-          );
-      }
-      if (summoner.xpProgress && summoner.xpProgress)
-        this.wrapper
-          .find(".summoner-level")
-          .attr("value", summoner.xpProgress.toFixed(0));
-
-      if (summoner.summonerLevel && summoner.summonerLevel)
-        this.wrapper
-          .find(".summoner-stats-card .value.level")
-          .text(summoner.summonerLevel);
-
-      if (summoner.name && summoner.name)
-        this.wrapper.find(".username").text(summoner.name);
-
-      this.wrapper.attr(
-        "class",
-        this.wrapper.hasClass("is-hidden") ? "wrapper is-hidden" : "wrapper"
-      );
-      if (summoner.gameStatus && summoner.gameStatus) {
-        this.wrapper.addClass(
-          summoner.gameStatus.replace(/[A-Z]/g, (m) => "-" + m.toLowerCase())
-        );
-        if (["inGame", "spectating"].includes(summoner.gameStatus)) {
-          this._cache.players = {};
-          this._updatePlayers();
-        }
-
-        this.wrapper
-          .find(".game-status")
-          .text(summoner.gameStatusLabel)
-          .parent()
-          .removeClass("is-hidden");
-      } else {
-        this.wrapper.find(".game-status").parent().addClass("is-hidden");
-      }
-      this.wrapper.find(".summoner-profile-card").removeClass("is-hidden");
-    } else {
-      this.wrapper.attr(
-        "class",
-        this.wrapper.hasClass("is-hidden") ? "wrapper is-hidden" : "wrapper"
-      );
-      this.wrapper.find(".summoner-level").attr("value", "0");
-      this.wrapper.find(".summoner-icon").removeAttr("style");
-      this.wrapper.find(".username").text("");
-      this.wrapper.find(".game-status").text("");
-      this.wrapper.find(".banner-level .center").text("");
-      this.wrapper.find(".summoner-profile-card").addClass("is-hidden");
-    }
-  },
-
-  _updateEvents() {},
-
+  // Render the in-game player grid. Players arrive grouped by team; the
+  // template exposes a .player.order / .player.chaos slot per row.
   _updatePlayers() {
     const { players: allPlayers } = this._cache;
     if (allPlayers && Object.keys(allPlayers).length > 0) {
+      const base = this._assetBase();
+      // Show one row per filled slot (5v5 normal, 6v6 Hexakill), hide the rest.
+      const teamSize = Math.max(
+        0,
+        ...Object.values(allPlayers).map((p) => p.length)
+      );
+      for (let r = 0; r < 6; r++) {
+        const row = this.wrapper.find(`.in-game-stats .row-${r}`);
+        if (r < teamSize) row.removeClass("is-hidden");
+        else row.addClass("is-hidden");
+      }
       Object.entries(allPlayers).forEach(([team, players]) => {
         const teamClass = team.trim().toLowerCase();
         players.forEach((player, i) => {
@@ -122,52 +108,27 @@ Module.register("MMM-LeagueStats", {
             `.in-game-stats .row-${i} .player.${teamClass}`
           );
 
-          playerRow
-            .find(".respawn-timer")
-            .text(
-              player.respawnTimer && typeof player.respawnTimer === "number"
-                ? player.respawnTimer.toFixed(0)
-                : "0"
-            );
-          playerRow
-            .find(".champion-avatar")
-            .css(
-              "background-image",
-              `url(/${this.name}/cdn/img/champion/tiles/${player.championAlias}_${player.skin}.jpg`
-            );
-          if (player.isDead) {
-            playerRow.addClass("is-dead");
-          } else {
-            playerRow.removeClass("is-dead");
-          }
+          this._setBg(
+            playerRow.find(".champion-avatar"),
+            `${base}/assets/champion/${player.championAlias}/splash/${player.skinNum}`
+          );
+
+          if (player.isDead) playerRow.addClass("is-dead");
+          else playerRow.removeClass("is-dead");
 
           Object.entries(player.scores).forEach(([k, score]) => {
-            playerRow.find("." + k).text(score.toFixed(0));
+            playerRow.find("." + k + " .v").text(score.toFixed(0));
           });
 
           playerRow.find(".champion-name").text(player.championName);
 
-          const skinName =
-            player.skinName === "default"
-              ? null
-              : `${player.skinName.replace(/(prestigios[ao]).+/gim, "$1")}`;
-          if (skinName)
-            playerRow
-              .find(".champion-skin")
-              .removeClass("is-hidden")
-              .text(skinName);
-          else playerRow.find(".champion-skin").addClass("is-hidden").text("");
-
-          for (let i = 0; i < 6; i++) {
-            const item = player.items.find((item) => item.slot === i);
-            const slot = playerRow.find(".slot.item-" + i);
+          for (let s = 0; s < 6; s++) {
+            const item = player.items.find((it) => it.slot === s);
+            const slot = playerRow.find(".slot.item-" + s);
             if (item) {
-              slot.css(
-                "background-image",
-                `url(/${this.name}/cdn/${this.version}/img/item/${item.itemID}.png)`
-              );
+              this._setBg(slot, `${base}/assets/item/${item.itemID}`);
             } else {
-              slot.removeAttr("style");
+              this._clearBg(slot);
             }
           }
         });
@@ -175,191 +136,29 @@ Module.register("MMM-LeagueStats", {
       this.wrapper.find(".game-stats-card").removeClass("is-hidden");
     } else {
       this.wrapper.find(".game-stats-card").addClass("is-hidden");
-      const gameStatsWrapper = this.wrapper.find(".in-game-stats");
-      gameStatsWrapper.find(".is-dead").removeClass("is-dead");
-      gameStatsWrapper.find(".player-champion").text("");
-      ["kills", "deaths", "assists", "creepScore", "wardScore"].forEach((k) => {
-        gameStatsWrapper.find("." + k).text("");
+      const grid = this.wrapper.find(".in-game-stats");
+      grid.find(".is-dead").removeClass("is-dead");
+      grid.find(".champion-name").text("");
+      ["kills", "deaths", "assists"].forEach((k) => {
+        grid.find("." + k + " .v").text("");
       });
-      gameStatsWrapper.find(".slot").removeAttr("style");
-    }
-  },
-
-  _appendHistoryItem(game) {
-    const historyList = this.wrapper.find(".recent-matches > .history-list");
-    const item = $("<li>")
-      .addClass("is-inline-block my-0 p-0 game-" + game.gameId)
-      .addClass(game.win ? "won" : "lost")
-      .data("gameId", game.gameId);
-    $("<img>", {
-      src: `/${this.name}/cdn/img/champion/tiles/${game.champion.alias}_${game.champion.currentSkin.num}.jpg`
-    })
-      .addClass("is-block")
-      .appendTo(item);
-
-    item.prependTo(historyList);
-  },
-
-  _updateHistory() {
-    const { history: allHistory } = this._cache;
-    const historyList = this.wrapper.find(".recent-matches > .history-list");
-    const maxLength = 10;
-    if (Array.isArray(allHistory) && allHistory.length > 0) {
-      const history = allHistory
-        .slice(0, maxLength)
-        .sort((a, b) =>
-          a.gameId > b.gameId ? 1 : b.gameId > a.gameId ? -1 : 0
-        );
-      const receivedHistoryIds = history.map(function (g) {
-        return g.gameId;
-      });
-      const currentHistoryIds = [];
-      const toDelete = [];
-      const toAdd = [];
-      historyList.find("li").each(function (_, li) {
-        const item = $(li),
-          gameId = item.data("gameId");
-        if (receivedHistoryIds.includes(gameId)) {
-          currentHistoryIds.push(gameId);
-        } else {
-          toDelete.push(item);
-        }
-        currentHistoryIds.push($(li).data("gameId"));
-      });
-      history.forEach(function (game) {
-        if (currentHistoryIds.includes(game.gameId)) return;
-        toAdd.push(game);
-      });
-
-      if (Math.max(toAdd.length, toDelete.length) === 0) return;
-
-      for (let i = 0; i < Math.max(toAdd.length, toDelete.length); i++) {
-        if (i < toAdd.length) this._appendHistoryItem(toAdd[i]);
-        if (i < toDelete.length) toDelete[i].remove();
-      }
-    } else {
-      historyList.children().remove();
-    }
-  },
-
-  _updateStats() {
-    const { stats } = this._cache;
-    if (stats) {
-      if (stats.matches)
-        this.wrapper
-          .find(".summoner-stats-card .value.matches")
-          .text(stats.matches + "");
-      if (stats.winRatio)
-        this.wrapper
-          .find(".summoner-stats-card .value.win-ratio")
-          .text(stats.winRatio + "%");
-      if (stats.kda)
-        this.wrapper
-          .find(".summoner-stats-card .title.kda span:last-child")
-          .text(stats.kda + "");
-      if (stats.kills && stats.deaths && stats.assists)
-        this.wrapper
-          .find(".summoner-stats-card .value.kda")
-          .text(stats.kills + " / " + stats.deaths + " / " + stats.assists);
-    }
-  },
-
-  _updateCurrentGame() {
-    const { currentGame } = this._cache;
-    if (currentGame) {
-      if (currentGame.buddies) {
-        this.wrapper
-          .find(".bottom .buddies")
-          .removeClass("is-hidden")
-          .text(currentGame.buddies);
-      } else {
-        this.wrapper.find(".bottom .buddies").addClass("is-hidden").text("");
-      }
-      if (currentGame.map) {
-        this.wrapper
-          .find(".bottom .current-map")
-          .removeClass("is-hidden")
-          .text(currentGame.map);
-      } else {
-        this.wrapper
-          .find(".bottom .current-map")
-          .addClass("is-hidden")
-          .text("");
-      }
-      const parts = [
-        currentGame.mode ?? undefined,
-        currentGame.gameQueueTypeLabel ?? undefined
-      ].filter(function (l) {
-        return typeof l === "string";
-      });
-      if (parts.length > 0) {
-        this.wrapper
-          .find(".bottom .current-mode")
-          .removeClass("is-hidden")
-          .text(parts.join(", "));
-      } else {
-        this.wrapper
-          .find(".bottom .current-mode")
-          .addClass("is-hidden")
-          .text("");
-      }
-    } else {
-      this.wrapper.find(".bottom .current-map").addClass("is-hidden").text("");
-      this.wrapper.find(".bottom .current-mode").addClass("is-hidden").text("");
-      this.wrapper.find(".bottom .buddies").addClass("is-hidden").text("");
-    }
-  },
-
-  _updateCurrentChampion() {
-    const { currentChampion } = this._cache;
-    if (currentChampion) {
-      if (currentChampion.currentSkin) {
-        this.wrapper
-          .find(".current-champion")
-          .removeClass("is-hidden")
-          .text(
-            (currentChampion.currentSkin.name === "default"
-              ? currentChampion.alias
-              : currentChampion.currentSkin.name
-            ).replace(/(prestigios[ao]).+/gim, "$1")
-          );
-      } else {
-        this.wrapper.find(".current-champion").addClass("is-hidden").text("");
-      }
-    } else {
-      this.wrapper.find(".current-champion").addClass("is-hidden").text("");
+      // Also drop the cached bg marker so a new match re-applies the image.
+      grid.find(".slot").removeAttr("style").data("bg", null);
+      grid.find(".champion-avatar").removeAttr("style").data("bg", null);
     }
   },
 
   _resetUi() {
-    this._cache = {
-      summoner: null,
-      events: null,
-      players: null,
-      history: null,
-      stats: null,
-      currentGame: null,
-      currentChampion: null
-    };
-    this._updateUi();
-  },
-
-  _updateUi() {
-    this._updateSummoner();
-    this._updateEvents();
+    this._cache = { players: null };
     this._updatePlayers();
-    this._updateHistory();
-    this._updateStats();
-    this._updateCurrentGame();
-    this._updateCurrentChampion();
   },
 
   _update(payload) {
     Object.entries(payload).forEach(([type, data]) => {
+      if (type !== "players") return;
       if (this._hasChanged(this._cache[type], data)) {
-        const updater = `_update${type[0].toUpperCase()}${type.slice(1)}`;
         this._cache[type] = data ?? null;
-        this[updater]();
+        this._updatePlayers();
       }
     });
   },
@@ -382,7 +181,7 @@ Module.register("MMM-LeagueStats", {
   },
 
   _loadTemplate() {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       const lT = () => {
         this.nunjucksEnvironment().render(
           `templates/template.njk`,
@@ -403,26 +202,39 @@ Module.register("MMM-LeagueStats", {
   },
 
   insertComponents() {
-    $(this.template).appendTo(this.wrapper);
+    Zepto(this.template).appendTo(this.wrapper);
   },
 
   getScripts() {
     return [
-      "moment.js",
       this.file("node_modules/zepto/dist/zepto.min.js"),
-      this.file("node_modules/mqtt/dist/mqtt.min.js"),
       this.file("node_modules/deep-diff/dist/deep-diff.min.js")
     ];
   },
 
-  // Load stylesheets
   getStyles() {
     return [`${this.name}.css`];
+  },
+
+  getTranslations() {
+    return {
+      en: "translations/en.json",
+      es: "translations/es.json"
+    };
   },
 
   getHeader: () => null,
 
   getDom() {
+    if (this.disabled) {
+      const warn = document.createElement("div");
+      warn.className = "MMM-LeagueStats-warning";
+      warn.textContent = this.translate("MISSING_RIOT_MONITOR_URL");
+      warn.style.padding = "1rem";
+      warn.style.color = "#ffb74d";
+      warn.style.fontWeight = "700";
+      return warn;
+    }
     return this.wrapper.get(0);
   },
 
@@ -433,27 +245,21 @@ Module.register("MMM-LeagueStats", {
   _notificationReceived(notification, payload) {
     switch (notification) {
       case "READY":
-        if (!payload.version || !payload.ready) {
+        if (!payload || !payload.ready) {
           this.wrapper.addClass("is-hidden");
-          this.wrapper.find(".game-stats-card").addClass("is-hidden");
           this._resetUi();
           break;
         }
         this.wrapper.removeClass("is-hidden");
-        this.version = payload.version;
         break;
       case "UPDATE":
-        if (!this.version) break;
-        const data = payload ?? {};
-        if (!data) return;
-        this._update(data);
+        this._update(payload ?? {});
         break;
       default:
     }
   },
 
-  // Socket Notification Received
-  socketNotificationReceived: function (notification, payload) {
+  socketNotificationReceived(notification, payload) {
     this._notificationReceived(
       notification.replace(new RegExp(`${this.name}-`, "gi"), ""),
       payload
