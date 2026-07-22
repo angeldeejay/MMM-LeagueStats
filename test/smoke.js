@@ -18,7 +18,8 @@ const stubs = {
 };
 const origLoad = Module._load;
 Module._load = function (request, ...rest) {
-  if (Object.prototype.hasOwnProperty.call(stubs, request)) return stubs[request];
+  if (Object.prototype.hasOwnProperty.call(stubs, request))
+    return stubs[request];
   return origLoad.call(this, request, ...rest);
 };
 
@@ -26,8 +27,13 @@ const helper = require("../node_helper.js");
 
 helper.config = { broker: "192.168.0.2", port: 1883 };
 helper._cache = {
-  summoner: null, events: null, players: null, history: null,
-  stats: null, currentGame: null, currentChampion: null
+  summoner: null,
+  events: null,
+  players: null,
+  history: null,
+  stats: null,
+  currentGame: null,
+  currentChampion: null
 };
 helper.sendSocketNotification = (notification, payload) => {
   console.log(`\n>> ${notification}`);
