@@ -113,6 +113,25 @@ check("unknown champion id degrades safely", () => {
   assert.strictEqual(t.ORDER[0].championAlias, "None");
 });
 
+console.log("\n_handleState");
+check("TFT match never activates the overlay", () => {
+  const sent = [];
+  helper.sendSocketNotification = (n, p) => sent.push([n, p]);
+  helper.ready = true;
+  // sync assertions are safe: the idle path returns before any await
+  helper._handleState({
+    connected: true,
+    phase: "InProgress",
+    mode: "TFT",
+    players
+  });
+  assert.strictEqual(helper.ready, false);
+  assert.deepStrictEqual(sent.at(-1), [
+    "MMM-LeagueStats-READY",
+    { ready: false }
+  ]);
+});
+
 console.log("\n_onClientInfo");
 check("locale change drops DDragon caches and replays last state", () => {
   let replayed = null;

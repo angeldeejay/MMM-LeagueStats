@@ -182,7 +182,12 @@ module.exports = NodeHelper.create({
 
   async _handleState(d) {
     this._lastState = d;
-    const inGame = d.connected === true && IN_GAME_PHASES.includes(d.phase);
+    // TFT matches expose no live player data, so the overlay stays hidden for
+    // them. riot-exposer already masks TFT upstream (phase None / mode NONE);
+    // this is defense in depth in case a raw mode slips through.
+    const isTft = `${d.mode || ""}`.toUpperCase().includes("TFT");
+    const inGame =
+      d.connected === true && !isTft && IN_GAME_PHASES.includes(d.phase);
 
     if (!inGame) {
       if (this.ready) this.log("Match ended — going idle");
