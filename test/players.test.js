@@ -15,7 +15,8 @@ const stubs = {
 };
 const origLoad = Module._load;
 Module._load = function (request, ...rest) {
-  if (Object.prototype.hasOwnProperty.call(stubs, request)) return stubs[request];
+  if (Object.prototype.hasOwnProperty.call(stubs, request))
+    return stubs[request];
   return origLoad.call(this, request, ...rest);
 };
 
@@ -46,7 +47,10 @@ const players = [
     team: "ORDER",
     championId: 157,
     skinId: 157001,
-    items: [{ slot: 0, itemID: 3006 }, { slot: 1, itemID: 6672 }],
+    items: [
+      { slot: 0, itemID: 3006 },
+      { slot: 1, itemID: 6672 }
+    ],
     scores: { kills: 7, deaths: 2, assists: 4 },
     dead: false,
     me: true
@@ -72,8 +76,9 @@ check("champion alias resolved via DDragon map", () => {
   assert.strictEqual(teams.ORDER[0].championAlias, "Yasuo");
   assert.strictEqual(teams.CHAOS[0].championAlias, "MonkeyKing");
 });
-check("skin number derived from skinId", () =>
-  assert.strictEqual(teams.ORDER[0].skinNum, 1) // 157001 % 1000
+check(
+  "skin number derived from skinId",
+  () => assert.strictEqual(teams.ORDER[0].skinNum, 1) // 157001 % 1000
 );
 check("championName = skin name, base skin falls back to champion name", () => {
   assert.strictEqual(teams.ORDER[0].championName, "High Noon Yasuo"); // skin 1
@@ -106,6 +111,30 @@ check("unknown champion id degrades safely", () => {
     { team: "ORDER", championId: 99999, skinId: 0, items: [], scores: {} }
   ]);
   assert.strictEqual(t.ORDER[0].championAlias, "None");
+});
+
+console.log("\n_onClientInfo");
+check("locale change drops DDragon caches and replays last state", () => {
+  let replayed = null;
+  helper._handleState = (d) => {
+    replayed = d;
+  };
+  helper._lastState = { connected: true, phase: "InProgress", players };
+
+  helper._onClientInfo({ region: "LA1", locale: "es_MX" });
+  assert.strictEqual(helper._locale, "es_MX");
+  assert.strictEqual(helper._champions, null);
+  assert.deepStrictEqual(helper._championDetail, {});
+  assert.strictEqual(replayed, helper._lastState);
+
+  // same locale again -> no-op, no replay
+  replayed = null;
+  helper._onClientInfo({ region: "LA1", locale: "es_MX" });
+  assert.strictEqual(replayed, null);
+
+  // garbage payload -> ignored
+  helper._onClientInfo({});
+  assert.strictEqual(helper._locale, "es_MX");
 });
 
 console.log(`\n${passed} checks passed`);

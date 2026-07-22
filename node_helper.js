@@ -4,9 +4,11 @@ const path = require("path");
 const mqtt = require("mqtt");
 const DeepDiff = require("deep-diff");
 
-// riot-exposer publishes one retained MQTT topic with the whole LCU client
-// state. NestJS wraps the payload as { pattern, data }.
+// riot-exposer publishes retained MQTT topics wrapped by NestJS as
+// { pattern, data }: the whole LCU client state, and the game client's
+// region/locale (LolL10nRegionLocale).
 const STATE_TOPIC = "data.state.updated";
+const CLIENT_INFO_TOPIC = "client.info.updated";
 
 // DDragon — only used to resolve championId -> alias/name for display and for
 // the riot-monitor asset URLs. One lazy fetch per process, no daemon.
@@ -25,13 +27,16 @@ module.exports = NodeHelper.create({
   ready: false,
   _cache: null,
 
-  // championId -> { alias, name } — lazy, in-memory, fetched once per process.
+  // championId -> { alias, name } — lazy, in-memory, fetched once per locale.
   _champions: null,
   _ddragonLoading: null,
   _ddVersion: null,
   // alias -> { skinNum: skinName } — fetched per champion on demand, cached.
   _championDetail: {},
   _detailLoading: {},
+  // DDragon locale — synced to the game client via CLIENT_INFO_TOPIC.
+  _locale: "en_US",
+  _lastState: null,
 
   start() {
     this.log("Starting");
@@ -56,7 +61,7 @@ module.exports = NodeHelper.create({
       );
       this._ddVersion = versions[0];
       const champ = await fetch(
-        `${DDRAGON}/cdn/${this._ddVersion}/data/en_US/champion.json`
+        `${DDRAGON}/cdn/${this._ddVersion}/data/${this._locale}/champion.json`
       ).then((r) => r.json());
       const map = {};
       for (const c of Object.values(champ.data)) {
@@ -74,17 +79,20 @@ module.exports = NodeHelper.create({
   },
 
   _champ(id) {
-    return (this._champions && this._champions[id]) || { alias: "None", name: "—" };
+    return (
+      (this._champions && this._champions[id]) || { alias: "None", name: "—" }
+    );
   },
 
   // Per-champion skin names — DDragon detail file, fetched once per alias.
   _loadDetail(alias) {
-    if (alias === "None" || this._championDetail[alias]) return Promise.resolve();
+    if (alias === "None" || this._championDetail[alias])
+      return Promise.resolve();
     if (this._detailLoading[alias]) return this._detailLoading[alias];
 
     this._detailLoading[alias] = (async () => {
       const doc = await fetch(
-        `${DDRAGON}/cdn/${this._ddVersion}/data/en_US/champion/${alias}.json`
+        `${DDRAGON}/cdn/${this._ddVersion}/data/${this._locale}/champion/${alias}.json`
       ).then((r) => r.json());
       const champ = doc.data && doc.data[alias];
       const skins = {};
@@ -130,7 +138,7 @@ module.exports = NodeHelper.create({
 
     this.client.on("connect", () => {
       this.debug("mqtt-connect");
-      this.client.subscribe(STATE_TOPIC);
+      this.client.subscribe([STATE_TOPIC, CLIENT_INFO_TOPIC]);
     });
     ["error", "reconnect", "offline", "close", "end"].forEach((ev) =>
       this.client.on(ev, () => this.debug(`mqtt-${ev}`))
@@ -141,7 +149,6 @@ module.exports = NodeHelper.create({
   },
 
   _onMessage(topic, message) {
-    if (topic !== STATE_TOPIC) return;
     let envelope;
     try {
       envelope = JSON.parse(message.toString());
@@ -154,12 +161,28 @@ module.exports = NodeHelper.create({
         ? envelope.data
         : envelope;
     if (!data || typeof data !== "object") return;
-    this._handleState(data);
+    if (topic === STATE_TOPIC) this._handleState(data);
+    else if (topic === CLIENT_INFO_TOPIC) this._onClientInfo(data);
+  },
+
+  // Game-client region/locale from riot-exposer. On locale change, drop every
+  // DDragon cache so names re-resolve in the client's language, then replay
+  // the last known state so an in-progress match refreshes immediately.
+  _onClientInfo(info) {
+    const locale = typeof info.locale === "string" ? info.locale.trim() : "";
+    if (!locale || locale === this._locale) return;
+    this.log(`Client locale: ${locale}`);
+    this._locale = locale;
+    this._champions = null;
+    this._ddragonLoading = null;
+    this._championDetail = {};
+    this._detailLoading = {};
+    if (this._lastState) this._handleState(this._lastState);
   },
 
   async _handleState(d) {
-    const inGame =
-      d.connected === true && IN_GAME_PHASES.includes(d.phase);
+    this._lastState = d;
+    const inGame = d.connected === true && IN_GAME_PHASES.includes(d.phase);
 
     if (!inGame) {
       if (this.ready) this.log("Match ended — going idle");
@@ -177,9 +200,7 @@ module.exports = NodeHelper.create({
 
     // Prefetch skin names for every champion in the match (cached per alias).
     const aliases = [
-      ...new Set(
-        (d.players || []).map((p) => this._champ(p.championId).alias)
-      )
+      ...new Set((d.players || []).map((p) => this._champ(p.championId).alias))
     ];
     await Promise.allSettled(aliases.map((a) => this._loadDetail(a)));
 
