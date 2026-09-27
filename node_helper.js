@@ -78,10 +78,12 @@ module.exports = NodeHelper.create({
     return this._ddragonLoading;
   },
 
+  // Game-mode variants (e.g. Jade_Blitzcrank, 60053) carry 60000 + the base
+  // champion id and the base champion's name. DDragon lists only base
+  // champions, so a variant falls back to its base id (id % 1000).
   _champ(id) {
-    return (
-      (this._champions && this._champions[id]) || { alias: "None", name: "—" }
-    );
+    const map = this._champions || {};
+    return map[id] || map[id % 1000] || { alias: "None", name: "—" };
   },
 
   // Per-champion skin names — DDragon detail file, fetched once per alias.

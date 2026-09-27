@@ -106,6 +106,14 @@ check("dead flag mapped", () => {
   assert.strictEqual(teams.ORDER[0].isDead, false);
   assert.strictEqual(teams.CHAOS[0].isDead, true);
 });
+check("mode variant id (60000 + base) resolves to the base champion", () => {
+  // Jade_Yasuo-style variants: CommunityDragon lists them, DDragon does not.
+  const t = helper._mapPlayers([
+    { team: "ORDER", championId: 60157, skinId: 1, items: [], scores: {} }
+  ]);
+  assert.strictEqual(t.ORDER[0].championAlias, "Yasuo");
+  assert.strictEqual(t.ORDER[0].championName, "High Noon Yasuo");
+});
 check("unknown champion id degrades safely", () => {
   const t = helper._mapPlayers([
     { team: "ORDER", championId: 99999, skinId: 0, items: [], scores: {} }
